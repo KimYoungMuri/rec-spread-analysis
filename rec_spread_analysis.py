@@ -8,7 +8,7 @@ from statsmodels.tsa.vector_ar.vecm import coint_johansen
 from arch import arch_model
 from datetime import datetime
 from sklearn.linear_model import LinearRegression
-from scipy.stats import linregress
+from scipy.stats import laplace
 from sklearn import linear_model
 from sklearn.preprocessing import StandardScaler
 import os
@@ -202,7 +202,13 @@ class RecSpreadAnalyzer:
         ax3.set_ylabel('Volatility')
         ax3.legend(loc = 'lower right', frameon=False)
         ax3.grid(True)
+        '''----------------------------------------------------------------------------------------------'''
 
+
+
+
+
+        '''----------------------------------------------------------------------------------------------'''
         
         # Akaike Information Criterion (AIC) and Bayesian Information Criterion (BIC)
         aic = res_log.aic
@@ -235,6 +241,14 @@ class RecSpreadAnalyzer:
 
         #print("THESE ARE AIC/BIC/BACKTEST/ERROR FOR NORMAL GARCH (constant mean):", aic, bic, backtest, error)
        
+    def jarque_bera(self): #check against chi square table for normal distribution
+        data = self.spread_df['LogReturns'].replace([np.inf, -np.inf], np.nan).dropna()
+        JB = stats.jarque_bera(data)
+        print("From library, JB Test: ", stats.jarque_bera(data), stats.jarque_bera(data).pvalue)
+        print("JB p-value (scientific notation): {:.20e}".format(JB.pvalue))
+        if (JB.pvalue < 0.01): # should follow chi-squared distribution with two degrees of freedom, but set as 0.01 temp
+            print("The p value is :", JB.pvalue)
+            print("The distribution is not normal")
 
     """
     def cointegration_test(self): (johansen test)
@@ -264,7 +278,8 @@ class RecSpreadAnalyzer:
         rand_shock = None
 
         for t in range(1, forecast_period):
-            rand_shock = np.random.normal(loc=0, scale=1, size=num_sim)
+            #rand_shock = np.random.normal(loc=0, scale=1, size=num_sim)
+            rand_shock = np.random.laplace(loc=0, scale=1, size=num_sim)
             simulated_price = simulated_paths[:, t-1] + theta * (drift - simulated_paths[:, t-1]) * dt + volatility * rand_shock * np.sqrt(dt)
             #simulated_price = simulated_paths[:, t - 1] + np.exp((drift - 0.5 * volatility ** 2) * dt + volatility * rand_shock * np.sqrt(dt))
             #simulated_price = simulated_paths[:, t - 1] * (1 + drift + volatility * rand_shock)
@@ -286,10 +301,10 @@ class RecSpreadAnalyzer:
         for i in range (simulated_paths.shape[0]): 
             plt.plot(date_range, simulated_paths[i], alpha=0.25, color='blue', linewidth=0.75)
             #print("Simulated path is: ", simulated_paths[i])
-        
-        sorted_simulated = np.sort(simulated_paths.flatten())
-        print("95%: ",np.percentile(sorted_simulated, 95))
-        print("5%: ", np.percentile(sorted_simulated, 5))
+        max_spread_per_sim = np.max(simulated_paths, axis=1)
+        min_spread_per_sim = np.min(simulated_paths, axis=1)
+        print("95% of max spread in 7 days:", np.percentile(max_spread_per_sim, 95))
+        print("5% of min spread in 7 days:", np.percentile(min_spread_per_sim, 5))
 
         meanPath = np.mean(simulated_paths, axis=0)
         percentile5 = np.percentile(simulated_paths, 5, axis=0)
@@ -322,8 +337,30 @@ class RecSpreadAnalyzer:
             sigma_t = forecasted_vol_log[t-1] # use dollar for spreadDiff
             print("This is daily vol: ", sigma_t)
             paths[:, t] = paths[:, t-1] * np.exp((mu_log - 0.5 * forecasted_vol_log[t-1]) * dt + sigma_t * np.sqrt(dt) * Z)
-        
         """
+
+    def plot_hist(self):
+        data = self.spread_df['LogReturns'].replace([np.inf, -np.inf], np.nan).dropna()
+        plt.figure(figsize=(10,6))
+        sns.histplot(data, bins=50, kde=True, color='skyblue', edgecolor='black', stat='density', label='Log Returns')
+        mu, std = data.mean(), data.std()
+        loc, scale = stats.laplace.fit(data)
+        xmin, xmax = plt.xlim()
+        x = np.linspace(xmin, xmax, 500)
+        p_norm = stats.norm.pdf(x, mu, std)
+        p_laplace = stats.laplace.pdf(x, loc, scale)
+        plt.plot(x, p_norm, 'r-', lw=2, label='Normal PDF')
+        plt.plot(x, p_laplace, 'g--', lw=2, label='Laplace PDF')
+        plt.title('Histogram of Log Returns with Normal and Laplace Fit')
+        plt.xlabel('Log Returns')
+        plt.ylabel('Density')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+        # Optionally, print a quick summary
+        print(data.describe())
+        print("Number of unique log return values:", data.nunique())
 
 def main(): 
     data = pd.read_csv('UREC_BGC.csv')
@@ -332,10 +369,12 @@ def main():
 
     df = RecSpreadAnalyzer(data, rec1, rec2)
     df.calc_spread()
-    df.plot_spread()
+    #df.plot_spread()
     df.calc_returns()
-    df.garch()
+    #df.garch()
     df.monte_carlo()
+    #df.jarque_bera()
+    #df.plot_hist()
 
 if __name__ == "__main__":
     main()
