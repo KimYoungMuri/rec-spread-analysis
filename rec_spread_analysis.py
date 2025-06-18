@@ -250,10 +250,14 @@ class RecSpreadAnalyzer:
             print("The p value is :", JB.pvalue)
             print("The distribution is not normal")
 
-    """
-    def cointegration_test(self): (johansen test)
+    '''
+    def cointegration_test(self): 
+        #johansen test 
+    '''
 
-    """
+
+
+    
     def monte_carlo(self):
         num_sim = 5000
         forecast_period = 7
@@ -372,9 +376,9 @@ def main():
     #df.plot_spread()
     df.calc_returns()
     #df.garch()
-    df.monte_carlo()
+    #df.monte_carlo()
     #df.jarque_bera()
-    #df.plot_hist()
+    df.plot_hist()
 
 if __name__ == "__main__":
     main()
@@ -383,3 +387,9 @@ if __name__ == "__main__":
 # get 95th and 5th percentile, get jarque bera test for adnan --> check hypothesis on laplace
 # look at what the arrays individually store
 
+'''
+- fix laplace on plot hist, and garch comparison. monte carlo should already have been done
+- cointegration (johansen test), find hedge ratio
+- look at what array is stored in each 
+
+'''
